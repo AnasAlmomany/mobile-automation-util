@@ -1,9 +1,10 @@
 package jo.aspire.web.automationUtil;
 
-import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -18,105 +19,55 @@ import org.openqa.selenium.firefox.FirefoxProfile;
 import org.openqa.selenium.ie.InternetExplorerDriver;
 import org.openqa.selenium.phantomjs.PhantomJSDriver;
 import org.openqa.selenium.phantomjs.PhantomJSDriverService;
-import org.openqa.selenium.remote.CapabilityType;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.LocalFileDetector;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.safari.SafariDriver;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import io.appium.java_client.android.AndroidDriver;
-import io.appium.java_client.remote.MobileCapabilityType;
-import jo.aspire.generic.EnvirommentManager;
 
 public class DriverProvider extends DelegatingWebDriverProvider {
 	private RemoteWebDriver driver;
 	private static String browser;
 	public static HashMap<Long, WebDriver> allThreads = new HashMap<Long, WebDriver>();
 	private static JsonObject driverInfo;
+	private DesiredCapabilities capabilities = new DesiredCapabilities();
 	
-	public static void setDriverToRun(JsonObject di){
+	public static void setDriverToRun(JsonObject di) {
 		driverInfo = di;
 	}
-	
+
 	@Override
 	public void initialize() {
+		boolean isRemote = Boolean.parseBoolean(driverInfo.get("isRemote").getAsString());
 
-		boolean runOnSource = Boolean.parseBoolean(EnvirommentManager.getInstance().getProperty("useSouceLabs"));
+		String remoteUrl = "";
 
-		boolean runOnStack = false;
-		try {
-			runOnStack = Boolean.parseBoolean(EnvirommentManager.getInstance().getProperty("useBrowserStack"));
-		} catch (Exception ex) {
+		// set capabilities
+		JsonObject capabilitiesObj = driverInfo.get("capabilities").getAsJsonObject();
+		Set<Map.Entry<String, JsonElement>> capabilitiesSet = capabilitiesObj.entrySet();
+
+		for (Map.Entry<String, JsonElement> entry : capabilitiesSet) {
+			capabilities.setCapability(entry.getKey(), entry.getValue());
 		}
 
-		if (runOnSource) {
-			DesiredCapabilities capabilities = new DesiredCapabilities();
-			if (PlatformInformation.browserName != null && !PlatformInformation.browserName.isEmpty()) {
-				capabilities.setCapability("browserName", PlatformInformation.browserName);
-			}
-			if (PlatformInformation.browserVersion != null && !PlatformInformation.browserVersion.isEmpty()) {
-				capabilities.setCapability("version", PlatformInformation.browserVersion);
-			}
-			capabilities.setCapability("platform", PlatformInformation.platformName);
-			if (PlatformInformation.screenResolution != null && !PlatformInformation.screenResolution.isEmpty()) {
-				capabilities.setCapability("screenResolution", PlatformInformation.screenResolution);
-			}
-			if (PlatformInformation.deviceName != null && !PlatformInformation.deviceName.isEmpty()) {
-				capabilities.setCapability("deviceName", PlatformInformation.deviceName);
-			}
-			if (PlatformInformation.deviceOrientation != null && !PlatformInformation.deviceOrientation.isEmpty()) {
-				capabilities.setCapability("deviceOrientation", PlatformInformation.deviceOrientation);
-			}
+		if (isRemote) {
+			remoteUrl = driverInfo.get("remote").getAsJsonObject().get("remoteUrl").getAsString();
 
 			try {
-				this.driver = new RemoteWebDriver(
-						new URL("http://" + EnvirommentManager.getInstance().getProperty("username") + ":"
-								+ EnvirommentManager.getInstance().getProperty("accessKey")
-								+ "@ondemand.saucelabs.com:80/wd/hub"),
-						capabilities);
-
-
-
+				this.driver = new RemoteWebDriver(new URL(remoteUrl), capabilities);
 				this.driver.setFileDetector(new LocalFileDetector());
-
-				allThreads.put(Thread.currentThread().getId(), this.driver );
-
-			}
-
-			catch (Exception e) {
-				// TODO Auto-generated catch block
+				allThreads.put(Thread.currentThread().getId(), this.driver);
+			} catch (Exception e) {
 				e.printStackTrace();
 			}
 			delegate.set((WebDriver) driver);
-		} else if (runOnStack) {
-			String stackUsername = EnvirommentManager.getInstance().getProperty("StackUsername");
-			String stackKey = EnvirommentManager.getInstance().getProperty("StackKey");
-			String stackUrl = "https://" + stackUsername + ":" + stackKey + "@hub-cloud.browserstack.com/wd/hub";
-			DesiredCapabilities caps = new DesiredCapabilities();
-			if (PlatformInformation.browserName != null && !PlatformInformation.browserName.isEmpty()) {
-				caps.setCapability("browser", PlatformInformation.browserName);
-			}
-			if (PlatformInformation.browserVersion != null && !PlatformInformation.browserVersion.isEmpty()) {
-				caps.setCapability("browser_version", PlatformInformation.browserVersion);
-			}
-			caps.setCapability("os", PlatformInformation.platformName);
-			caps.setCapability("os_version", PlatformInformation.platformVersion);
-			if (PlatformInformation.screenResolution != null && !PlatformInformation.screenResolution.isEmpty()) {
-				caps.setCapability("resolution", PlatformInformation.screenResolution);
-			}
-			if (PlatformInformation.projectName != null && !PlatformInformation.projectName.isEmpty()) {
-				caps.setCapability("project", PlatformInformation.projectName);
-			}
-			caps.setCapability("browserstack.debug", "true");
-			try {
-				this.driver = new RemoteWebDriver(new URL(stackUrl), caps);
-				allThreads.put(Thread.currentThread().getId(), this.driver);
-			} catch (Exception ex) {
-			}
 		} else {
-			browser = PlatformInformation.browserName;
+			browser = driverInfo.get("name").getAsString().toLowerCase();
 			WebDriver webDriver = createDriver();
 			allThreads.put(Thread.currentThread().getId(), webDriver);
 			delegate.set(webDriver);
@@ -127,10 +78,10 @@ public class DriverProvider extends DelegatingWebDriverProvider {
 	}
 
 	private WebDriver createDriver() {
-		if (PlatformInformation.isMobile) {
+		if (Boolean.parseBoolean(driverInfo.get("isMobile").getAsString())) {
 			return createAndroidBrowser();
 		} else {
-			if (browser.equals("Phantom")) {
+			if (browser.equals("phantom")) {
 				return createPhantomDrive();
 				// } else if (browser.equals("htmlUnit")) {
 				// return createHtmlUnitDriver();
@@ -142,9 +93,9 @@ public class DriverProvider extends DelegatingWebDriverProvider {
 				return createInternetExplorerDriver64();
 			} else if (browser.equals("safari")) {
 				return createSafariDriver();
-			} else if (browser.equals("remote")) {
-				return createRemoteDriver();
-			} else if(browser.equals("edge")) {
+//			} else if (browser.equals("remote")) {
+//				return createRemoteDriver();
+			} else if (browser.equals("edge")) {
 				return createEdgeDriver();
 			} else {
 				return createFirefoxDriver();
@@ -152,44 +103,41 @@ public class DriverProvider extends DelegatingWebDriverProvider {
 
 		}
 	}
-protected WebDriver createEdgeDriver(){
-	System.setProperty("webdriver.edge.driver",
-			System.getProperty("user.dir") + "/webdrivers/edge/MicrosoftWebDriver.exe");
-	EdgeDriver driver = new EdgeDriver();
 
-	return driver;
-}
+	protected WebDriver createEdgeDriver() {
+		System.setProperty("webdriver.edge.driver",
+				System.getProperty("user.dir") + "/webdrivers/edge/MicrosoftWebDriver.exe");
+		EdgeDriver driver = new EdgeDriver();
+
+		return driver;
+	}
+
 	protected WebDriver createAndroidBrowser() {
-		DesiredCapabilities caps = new DesiredCapabilities();
-		caps.setCapability(MobileCapabilityType.BROWSER_NAME, browser);
-		caps.setCapability(MobileCapabilityType.PLATFORM_VERSION, PlatformInformation.browserVersion);
-		caps.setCapability(MobileCapabilityType.PLATFORM_NAME, PlatformInformation.browserName);
-		caps.setCapability(MobileCapabilityType.DEVICE_NAME, PlatformInformation.deviceName);
+		
 		URL serverAddress = null;
 		try {
 			serverAddress = new URL("http://127.0.0.1:" + "4723" + "/wd/hub");
 		} catch (MalformedURLException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		AndroidDriver driver = new AndroidDriver(serverAddress, caps);
+		AndroidDriver driver = new AndroidDriver(serverAddress, capabilities);
 		return driver;
 	}
 
-	protected RemoteWebDriver createRemoteDriver() {
-		DesiredCapabilities cap = null;
-		if (PlatformInformation.remoteBrowserName.equals("chrome")) {
-			cap = DesiredCapabilities.chrome();
-		} else {
-			cap = DesiredCapabilities.firefox();
-		}
-		try {
-			return new RemoteWebDriver(new URL(PlatformInformation.remoteUrl), cap);
-		} catch (Exception e) {
-			e.printStackTrace();
-			return null;
-		}
-	}
+//	protected RemoteWebDriver createRemoteDriver() {
+//		DesiredCapabilities cap = null;
+//		if (browser.equals("chrome")) {
+//			cap = DesiredCapabilities.chrome();
+//		} else {
+//			cap = DesiredCapabilities.firefox();
+//		}
+//		try {
+//			return new RemoteWebDriver(new URL(driverInfo.get("remote").getAsJsonObject().get("remoteUrl").getAsString()), cap);
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//			return null;
+//		}
+//	}
 
 	protected ChromeDriver createChromeDriver() {
 		if (OSValidator.isMac()) {
@@ -206,31 +154,56 @@ protected WebDriver createEdgeDriver(){
 					System.getProperty("user.dir") + "/webdrivers/chrome/linux/chromedriver");
 		}
 		ChromeOptions options = new ChromeOptions();
-		options.addArguments("start-maximized");
+		
+		
+		// set arguments
+		if (!driverInfo.get("arguments").isJsonNull()){
+			JsonArray arguments = driverInfo.get("arguments").getAsJsonArray();
+			for (JsonElement arg : arguments) {
+				options.addArguments(arg.getAsString());
+			}
+		}
+		
+		
 		HashMap<String, Object> chromePrefs = new HashMap<String, Object>();
 
-		chromePrefs.put("profile.default_content_settings.popups", 0);
-		chromePrefs.put("profile.default_content_setting_values.notifications", 2);
-		chromePrefs.put("download.default_directory", System.getProperty("user.dir") + File.separator + "Temp");
-		options.setExperimentalOption("prefs", chromePrefs);
-		DesiredCapabilities cap = DesiredCapabilities.chrome();
-		if (PlatformInformation.isProxy) {
-			addProxyCapabilities(cap, PlatformInformation.proxyHost, PlatformInformation.proxyPort);
-		}
-		// options.addArguments("user-data-dir="+System.getProperty("user.dir")
-		// + File.separator + "SeleniumChromeDriveProfile");
-		cap.setCapability(CapabilityType.ACCEPT_SSL_CERTS, true);
-		options.addArguments("disable-popup-blocking");
-		cap.setCapability(ChromeOptions.CAPABILITY, options);
-		options.addArguments("test-type");
-		options.addArguments("--disable-extensions");
+//		chromePrefs.put("profile.default_content_settings.popups", 0);
+//		chromePrefs.put("profile.default_content_setting_values.notifications", 2);
+		
+		// set preferences
+		if (!driverInfo.get("preferences").isJsonNull()){			
+			JsonObject preferencesObj = driverInfo.get("preferences").getAsJsonObject();
+			Set<Map.Entry<String, JsonElement>> preferencesSet = preferencesObj.entrySet();
 
-		return new FixedChromeDriver(cap);
+			for (Map.Entry<String, JsonElement> entry : preferencesSet) {
+				chromePrefs.put(entry.getKey(), entry.getValue());
+			}
+		}
+		
+//		chromePrefs.put("download.default_directory", System.getProperty("user.dir") + File.separator + "Temp");
+		
+		options.setExperimentalOption("prefs", chromePrefs);
+		
+//		DesiredCapabilities cap = DesiredCapabilities.chrome();
+		
+		boolean isProxy = Boolean.parseBoolean(driverInfo.get("local").getAsJsonObject().get("isProxy").getAsString());
+		
+		if (isProxy) {
+			String proxyHost = driverInfo.get("local").getAsJsonObject().get("proxy").getAsJsonObject().get("proxyHost").getAsString();
+			Integer proxyPort = Integer.parseInt(driverInfo.get("local").getAsJsonObject().get("proxy").getAsJsonObject().get("proxyPort").getAsString());
+
+			addProxyCapabilities(capabilities, proxyHost, proxyPort);
+		}
+
+//		cap.setCapability(CapabilityType.ACCEPT_SSL_CERTS, true);
+//		cap.setCapability(ChromeOptions.CAPABILITY, options);
+
+		return new FixedChromeDriver(capabilities);
 	}
 
 	protected PhantomJSDriver createPhantomDrive() {
-		
-		DesiredCapabilities capabilities = DesiredCapabilities.phantomjs();
+
+//		DesiredCapabilities capabilities = DesiredCapabilities.phantomjs();
 		if (OSValidator.isMac()) {
 			capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_EXECUTABLE_PATH_PROPERTY,
 					System.getProperty("user.dir") + "/webdrivers/phantom/mac/phantomjs");
@@ -242,35 +215,46 @@ protected WebDriver createEdgeDriver(){
 			capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_EXECUTABLE_PATH_PROPERTY,
 					System.getProperty("user.dir") + "/webdrivers/phantom/linux/phantomjs");
 		}
-		String[] phantomArgs = new String[] { "--webdriver-loglevel=NONE" };
-		capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_CLI_ARGS, phantomArgs);
+		
+//		String[] phantomArgs = new String[] { "--webdriver-loglevel=NONE" };
+//		capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_CLI_ARGS, phantomArgs);
 		Logger.getLogger(PhantomJSDriverService.class.getName()).setLevel(Level.OFF);
 		Logger.getLogger(PhantomJSDriverService.class.getName()).setLevel(Level.OFF);
-		capabilities.setCapability("JavascriptEnabled", true);
-		capabilities.setCapability("cssSelectorsEnabled", true);
-		capabilities.setCapability("applicationCacheEnabled", false);
-		capabilities.setCapability(CapabilityType.ACCEPT_SSL_CERTS, true);
-		capabilities.setCapability(CapabilityType.SUPPORTS_ALERTS, true);
-		capabilities.setCapability(CapabilityType.SUPPORTS_JAVASCRIPT, true);
+//		capabilities.setCapability("JavascriptEnabled", true);
+//		capabilities.setCapability("cssSelectorsEnabled", true);
+//		capabilities.setCapability("applicationCacheEnabled", false);
+//		capabilities.setCapability(CapabilityType.ACCEPT_SSL_CERTS, true);
+//		capabilities.setCapability(CapabilityType.SUPPORTS_ALERTS, true);
+//		capabilities.setCapability(CapabilityType.SUPPORTS_JAVASCRIPT, true);
 		return new PhantomJSDriver(capabilities);
 	}
 
 	protected FirefoxDriver createFirefoxDriver() {
 		FirefoxProfile firefoxProfile = new FirefoxProfile();
-		// FirefoxProfile firefoxProfile = profile.getProfile("default");
-		String path = System.getProperty("user.dir") + File.separator + "Temp";
-		firefoxProfile.setPreference("browser.download.folderList", 2);
-		firefoxProfile.setPreference("browser.download.manager.showWhenStarting", false);
-		firefoxProfile.setPreference("browser.download.dir", path);
-		firefoxProfile.setPreference("browser.helperApps.neverAsk.saveToDisk",
-				"application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/comma-separated-values, text/csv, application/csv, application/excel, application/vnd.msexcel, text/anytext , application/x-xpinstall,application/x-zip,application/x-zip-compressed,application/octet-stream,application/zip,application/pdf,application/msword,text/plain,application/octet,text/html, application/x-csv, text/x-csv , application/msexcel,binary/octet-stream , text/html ,application/xhtml+xml,application/xml,application/json");
-		if (PlatformInformation.isProxy) {
-			firefoxProfile.setPreference("network.proxy.type", 1);
-			firefoxProfile.setPreference("network.proxy.http", PlatformInformation.proxyHost);
-			firefoxProfile.setPreference("network.proxy.http_port", PlatformInformation.proxyPort);
-			firefoxProfile.setPreference("network.proxy.ssl", PlatformInformation.proxyHost);
-			firefoxProfile.setPreference("network.proxy.ssl_port", PlatformInformation.proxyPort);
+
+//		String path = System.getProperty("user.dir") + File.separator + "Temp";
+//		firefoxProfile.setPreference("browser.download.folderList", 2);
+//		firefoxProfile.setPreference("browser.download.manager.showWhenStarting", false);
+//		firefoxProfile.setPreference("browser.download.dir", path);
+//		firefoxProfile.setPreference("browser.helperApps.neverAsk.saveToDisk",
+//				"application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/comma-separated-values, text/csv, application/csv, application/excel, application/vnd.msexcel, text/anytext , application/x-xpinstall,application/x-zip,application/x-zip-compressed,application/octet-stream,application/zip,application/pdf,application/msword,text/plain,application/octet,text/html, application/x-csv, text/x-csv , application/msexcel,binary/octet-stream , text/html ,application/xhtml+xml,application/xml,application/json");
+//		if (PlatformInformation.isProxy) {
+//			firefoxProfile.setPreference("network.proxy.type", 1);
+//			firefoxProfile.setPreference("network.proxy.http", PlatformInformation.proxyHost);
+//			firefoxProfile.setPreference("network.proxy.http_port", PlatformInformation.proxyPort);
+//			firefoxProfile.setPreference("network.proxy.ssl", PlatformInformation.proxyHost);
+//			firefoxProfile.setPreference("network.proxy.ssl_port", PlatformInformation.proxyPort);
+//		}
+		
+		// set preferences
+		if (!driverInfo.get("preferences").isJsonNull()){			
+			JsonObject preferencesObj = driverInfo.get("preferences").getAsJsonObject();
+			Set<Map.Entry<String, JsonElement>> preferencesSet = preferencesObj.entrySet();
+			for (Map.Entry<String, JsonElement> entry : preferencesSet) {
+				firefoxProfile.setPreference(entry.getKey().toString(), entry.getValue().toString());
+			}
 		}
+		
 		return new FixedFirefoxDriver(firefoxProfile);
 	}
 
@@ -291,8 +275,7 @@ protected WebDriver createEdgeDriver(){
 		return new SafariDriver();
 	}
 
-	private DesiredCapabilities addProxyCapabilities(DesiredCapabilities capabilities, String zapProxyHost,
-			int zapProxyPort) {
+	private DesiredCapabilities addProxyCapabilities(DesiredCapabilities capabilities, String zapProxyHost, int zapProxyPort) {
 		Proxy proxy = new Proxy();
 		proxy.setHttpProxy(zapProxyHost + ":" + zapProxyPort);
 		proxy.setSslProxy(zapProxyHost + ":" + zapProxyPort);

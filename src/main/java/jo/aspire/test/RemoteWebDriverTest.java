@@ -6,7 +6,6 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
 
-import jo.aspire.web.automationUtil.PlatformInformation;
 
 public class RemoteWebDriverTest {
 	public static void main(String[] args){
