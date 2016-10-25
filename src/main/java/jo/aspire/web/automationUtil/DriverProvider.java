@@ -196,25 +196,25 @@ public class DriverProvider extends DelegatingWebDriverProvider {
 		}
 
 //		cap.setCapability(CapabilityType.ACCEPT_SSL_CERTS, true);
-//		cap.setCapability(ChromeOptions.CAPABILITY, options);
-
+		capabilities.setCapability(ChromeOptions.CAPABILITY, options);
+		System.out.print(capabilities);
 		return new FixedChromeDriver(capabilities);
 	}
 
 	protected PhantomJSDriver createPhantomDrive() {
 
 //		DesiredCapabilities capabilities = DesiredCapabilities.phantomjs();
-		if (OSValidator.isMac()) {
-			capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_EXECUTABLE_PATH_PROPERTY,
-					System.getProperty("user.dir") + "/webdrivers/phantom/mac/phantomjs");
-		} else if (OSValidator.isWindows()) {
-
-			capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_EXECUTABLE_PATH_PROPERTY,
-					System.getProperty("user.dir") + "/webdrivers/phantom/win/phantomjs.exe");
-		} else if (OSValidator.isUnix()) {
-			capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_EXECUTABLE_PATH_PROPERTY,
-					System.getProperty("user.dir") + "/webdrivers/phantom/linux/phantomjs");
-		}
+//		if (OSValidator.isMac()) {
+//			capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_EXECUTABLE_PATH_PROPERTY,
+//					System.getProperty("user.dir") + "/webdrivers/phantom/mac/phantomjs");
+//		} else if (OSValidator.isWindows()) {
+//
+//			capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_EXECUTABLE_PATH_PROPERTY,
+//					System.getProperty("user.dir") + "/webdrivers/phantom/win/phantomjs.exe");
+//		} else if (OSValidator.isUnix()) {
+//			capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_EXECUTABLE_PATH_PROPERTY,
+//					System.getProperty("user.dir") + "/webdrivers/phantom/linux/phantomjs");
+//		}
 		
 //		String[] phantomArgs = new String[] { "--webdriver-loglevel=NONE" };
 //		capabilities.setCapability(PhantomJSDriverService.PHANTOMJS_CLI_ARGS, phantomArgs);

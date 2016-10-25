@@ -2,12 +2,12 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>jo.aspire.automationutil</groupId>
-	<artifactId>automationUtil</artifactId>
+	<groupId>jo.aspire.automationutil-omar</groupId>
+	<artifactId>automationUtil-omar</artifactId>
 	<version>1.0</version>
 	<packaging>jar</packaging>
 	<description>Core classes for automation</description>
-	<name>automationUtil</name>
+	<name>automationUtil-omar</name>
 	<url>http://aspire.jo</url>
 	<dependencies>
 
